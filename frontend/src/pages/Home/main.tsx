@@ -1,18 +1,24 @@
-import { useState } from 'react';
-import { useProductList, useProductDetail, useProductSearch } from '@/domain/product/hooks';
+import { useState, useMemo } from 'react';
+import {
+  useProductList,
+  useProductDetail,
+  useProductSearch,
+  usePriceFilter,
+} from '@/domain/product/hooks';
 import {
   ProductGrid,
   Pagination,
   ProductModal,
   SearchBar,
   SearchResults,
+  PriceFilter,
 } from '@/domain/product/components';
 import { LoadingSpinner } from '@/core/components/LoadingSpinner';
 import { ErrorMessage } from '@/core/components/ErrorMessage';
 
 /**
  * @page HomePage
- * @summary Home page displaying Monster Energy product catalog with search
+ * @summary Home page displaying Monster Energy product catalog with search and price filter
  * @domain catalog
  * @type page-component
  * @category catalog
@@ -25,7 +31,8 @@ import { ErrorMessage } from '@/core/components/ErrorMessage';
  *
  * @description
  * Main landing page that displays the Monster Energy product catalog
- * with text search, pagination, and product detail modal.
+ * with text search, price filtering, pagination, and product detail modal.
+ * Filters work together: text search + price filter are applied simultaneously.
  */
 export const HomePage = () => {
   const [currentPage, setCurrentPage] = useState(1);
@@ -38,16 +45,28 @@ export const HomePage = () => {
   const {
     searchTerm,
     debouncedSearchTerm,
-    filteredProducts,
+    filteredProducts: searchFilteredProducts,
     searchHistory,
     showSuggestions,
     handleSearchChange,
     clearSearch,
     selectSuggestion,
     toggleSuggestions,
-    totalResults,
   } = useProductSearch({
     products: data?.products || [],
+  });
+
+  const {
+    minPrice,
+    maxPrice,
+    catalogMinPrice,
+    catalogMaxPrice,
+    isFilterActive: isPriceFilterActive,
+    filteredProducts: priceFilteredProducts,
+    handlePriceChange,
+    clearFilter: clearPriceFilter,
+  } = usePriceFilter({
+    products: searchFilteredProducts,
   });
 
   const {
@@ -71,6 +90,24 @@ export const HomePage = () => {
     setCurrentPage(page);
   };
 
+  // Determine which products to display based on active filters
+  const isSearching = debouncedSearchTerm.length >= 3;
+  const isFiltering = isSearching || isPriceFilterActive;
+
+  const displayProducts = useMemo(() => {
+    if (isSearching || isPriceFilterActive) {
+      return priceFilteredProducts;
+    }
+    return data?.products || [];
+  }, [isSearching, isPriceFilterActive, priceFilteredProducts, data?.products]);
+
+  const totalResults = useMemo(() => {
+    if (isFiltering) {
+      return priceFilteredProducts.length;
+    }
+    return data?.totalProducts || 0;
+  }, [isFiltering, priceFilteredProducts.length, data?.totalProducts]);
+
   if (error) {
     return (
       <ErrorMessage
@@ -80,9 +117,6 @@ export const HomePage = () => {
       />
     );
   }
-
-  const isSearching = debouncedSearchTerm.length >= 3;
-  const displayProducts = isSearching ? filteredProducts : data?.products || [];
 
   return (
     <div className="space-y-8">
@@ -105,10 +139,20 @@ export const HomePage = () => {
         />
       </section>
 
+      <PriceFilter
+        minPrice={minPrice}
+        maxPrice={maxPrice}
+        catalogMinPrice={catalogMinPrice}
+        catalogMaxPrice={catalogMaxPrice}
+        isFilterActive={isPriceFilterActive}
+        onPriceChange={handlePriceChange}
+        onClearFilter={clearPriceFilter}
+      />
+
       <SearchResults
-        totalResults={isSearching ? totalResults : data?.totalProducts || 0}
+        totalResults={totalResults}
         searchTerm={debouncedSearchTerm}
-        isSearching={isSearching}
+        isSearching={isFiltering}
       />
 
       {isLoading ? (
@@ -121,7 +165,7 @@ export const HomePage = () => {
             isLoading={isLoading}
           />
 
-          {!isSearching && data && data.totalPages > 1 && (
+          {!isFiltering && data && data.totalPages > 1 && (
             <Pagination
               currentPage={data.currentPage}
               totalPages={data.totalPages}

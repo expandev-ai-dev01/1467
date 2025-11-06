@@ -137,3 +137,15 @@ export interface ProductDetail {
   ratingDistribution: string;
   nutritionalInfo: NutritionalInfo;
 }
+
+/**
+ * @interface PriceLimits
+ * @description Price range limits from catalog
+ *
+ * @property {number} minPrice - Minimum price in catalog
+ * @property {number} maxPrice - Maximum price in catalog
+ */
+export interface PriceLimits {
+  minPrice: number;
+  maxPrice: number;
+}

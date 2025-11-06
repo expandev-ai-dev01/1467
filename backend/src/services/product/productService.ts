@@ -1,4 +1,4 @@
-import { ProductListResponse, ProductDetail } from './productTypes';
+import { ProductListResponse, ProductDetail, PriceLimits } from './productTypes';
 
 /**
  * @summary
@@ -303,5 +303,149 @@ export async function productGet(idProduct: number): Promise<ProductDetail> {
       ingredients: nutrition.ingredients,
       allergens: nutrition.allergens,
     },
+  };
+}
+
+/**
+ * @summary
+ * Retrieves minimum and maximum price limits from the catalog
+ *
+ * @function getPriceLimits
+ * @module product
+ *
+ * @returns {Promise<PriceLimits>} Price limits
+ */
+export async function getPriceLimits(): Promise<PriceLimits> {
+  const prices = products.map((p) => p.price);
+  const minPrice = Math.min(...prices);
+  const maxPrice = Math.max(...prices);
+
+  return {
+    minPrice: Math.round(minPrice * 100) / 100,
+    maxPrice: Math.round(maxPrice * 100) / 100,
+  };
+}
+
+/**
+ * @summary
+ * Retrieves paginated list of products filtered by price range
+ *
+ * @function productListByPriceRange
+ * @module product
+ *
+ * @param {number} minPrice - Minimum price
+ * @param {number} maxPrice - Maximum price
+ * @param {number} page - Page number (default: 1)
+ * @param {number} pageSize - Products per page (default: 16)
+ * @param {string} searchText - Optional text filter to combine with price filter
+ *
+ * @returns {Promise<ProductListResponse>} Paginated filtered product list
+ *
+ * @throws {Error} When parameters are invalid
+ */
+export async function productListByPriceRange(
+  minPrice: number,
+  maxPrice: number,
+  page: number = 1,
+  pageSize: number = 16,
+  searchText: string = ''
+): Promise<ProductListResponse> {
+  /**
+   * @validation Validate pagination parameters
+   */
+  if (page < 1) {
+    throw new Error('pageMustBePositive');
+  }
+
+  if (pageSize < 1) {
+    throw new Error('pageSizeMustBePositive');
+  }
+
+  /**
+   * @rule {be-database-requirement} Get catalog limits for validation
+   */
+  const limits = await getPriceLimits();
+
+  /**
+   * @validation Validate price range against catalog limits
+   */
+  if (minPrice < limits.minPrice) {
+    throw new Error('minPriceBelowCatalogLimit');
+  }
+
+  if (maxPrice > limits.maxPrice) {
+    throw new Error('maxPriceAboveCatalogLimit');
+  }
+
+  /**
+   * @rule {be-database-requirement} Filter products by price range
+   */
+  let filteredProducts = products.filter((p) => p.price >= minPrice && p.price <= maxPrice);
+
+  /**
+   * @rule {be-database-requirement} Apply text filter if provided
+   */
+  if (searchText && searchText.trim() !== '') {
+    const searchLower = searchText.toLowerCase().trim();
+    filteredProducts = filteredProducts.filter(
+      (p) =>
+        p.name.toLowerCase().includes(searchLower) ||
+        p.shortDescription.toLowerCase().includes(searchLower) ||
+        p.category.toLowerCase().includes(searchLower)
+    );
+  }
+
+  /**
+   * @rule {be-database-requirement} Sort by sales count
+   */
+  const sortedProducts = [...filteredProducts].sort((a, b) => b.salesCount - a.salesCount);
+
+  const totalProducts = sortedProducts.length;
+  const totalPages = Math.ceil(totalProducts / pageSize);
+
+  /**
+   * @rule {be-database-requirement} Apply pagination
+   */
+  const offset = (page - 1) * pageSize;
+  const paginatedProducts = sortedProducts.slice(offset, offset + pageSize);
+
+  /**
+   * @rule {be-database-requirement} Build response with ratings and nutritional summary
+   */
+  const productList = paginatedProducts.map((product) => {
+    const productReviews = reviews.filter((r) => r.idProduct === product.idProduct);
+    const averageRating =
+      productReviews.length > 0
+        ? productReviews.reduce((sum, r) => sum + r.rating, 0) / productReviews.length
+        : 0.0;
+
+    const nutrition = nutritionalInfo.find((n) => n.idProduct === product.idProduct);
+    const nutritionalSummary = nutrition
+      ? JSON.stringify({
+          calorias: `${nutrition.calories} kcal`,
+          acucares: `${nutrition.sugars}g`,
+          cafeina: `${nutrition.caffeine}mg`,
+        })
+      : '{}';
+
+    return {
+      idProduct: product.idProduct,
+      name: product.name,
+      imageUrl: product.imageUrl,
+      shortDescription: product.shortDescription,
+      price: product.price,
+      averageRating: Math.round(averageRating * 10) / 10,
+      reviewCount: productReviews.length,
+      available: product.available,
+      nutritionalSummary,
+    };
+  });
+
+  return {
+    products: productList,
+    totalProducts,
+    currentPage: page,
+    pageSize,
+    totalPages,
   };
 }

@@ -16,6 +16,7 @@ export interface Product {
   reviewCount: number;
   available: boolean;
   nutritionalSummary: NutritionalSummary;
+  category?: string;
 }
 
 export interface ProductDetail extends Product {

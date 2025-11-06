@@ -3,7 +3,7 @@
  * @summary Product catalog domain module for Monster Energy products
  * @domain functional
  * @dependencies TanStack Query, Axios, React Router
- * @version 1.1.0
+ * @version 1.2.0
  * @author Development Team
  * @lastModified 2024-01-15
  */
@@ -16,7 +16,7 @@ export * from './types';
 export const moduleMetadata = {
   name: 'product',
   domain: 'functional',
-  version: '1.1.0',
+  version: '1.2.0',
   publicComponents: [
     'ProductCard',
     'ProductGrid',
@@ -24,8 +24,9 @@ export const moduleMetadata = {
     'ProductModal',
     'SearchBar',
     'SearchResults',
+    'PriceFilter',
   ],
-  publicHooks: ['useProductList', 'useProductDetail', 'useProductSearch'],
+  publicHooks: ['useProductList', 'useProductDetail', 'useProductSearch', 'usePriceFilter'],
   publicServices: ['productService'],
   dependencies: {
     internal: ['@/core/lib/api', '@/core/lib/queryClient', '@/core/utils/cn'],
@@ -40,8 +41,9 @@ export const moduleMetadata = {
       'ProductModal',
       'SearchBar',
       'SearchResults',
+      'PriceFilter',
     ],
-    hooks: ['useProductList', 'useProductDetail', 'useProductSearch'],
+    hooks: ['useProductList', 'useProductDetail', 'useProductSearch', 'usePriceFilter'],
     services: ['productService'],
     types: [
       'Product',
